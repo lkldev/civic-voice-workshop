@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import cors from "cors";
 import { createDb } from "./lib/db.js";
+import { verifyPassword } from "./lib/passwords.js";
 
 export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
@@ -26,7 +27,7 @@ export async function createApp(options = {}) {
   app.post("/api/login", (req, res) => {
     const { nric, password, role } = req.body ?? {};
     const user = db.data.users.find(
-      (candidate) => candidate.nric === nric && candidate.password === password && candidate.role === role,
+      (candidate) => candidate.nric === nric && verifyPassword(password, candidate.passwordHash) && candidate.role === role,
     );
     if (!user) return res.status(401).json({ error: "Invalid NRIC, password, or sign-in mode." });
 
