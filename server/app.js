@@ -6,6 +6,9 @@ import { createDb } from "./lib/db.js";
 export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
   const sessions = new Map();
+  const openaiApiKey = options.openaiApiKey ?? process.env.OPENAI_API_KEY;
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const openaiBaseUrl = (options.openaiBaseUrl ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
   const app = express();
   app.use(cors());
   app.use(express.json());
@@ -40,6 +43,47 @@ export async function createApp(options = {}) {
       return res.status(403).json({ error: "Admin access required." });
     }
     return res.json({ feedback: db.data.feedback });
+  });
+
+  app.post("/api/feedback/:id/translation", requireSession, async (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+    const feedback = db.data.feedback.find((candidate) => candidate.id === req.params.id);
+    if (!feedback) return res.status(404).json({ error: "Feedback not found." });
+    const original = typeof feedback.message === "string" ? feedback.message.trim() : "";
+    if (!original) return res.status(400).json({ error: "Feedback has no text to translate." });
+    if (!openaiApiKey) {
+      return res.status(503).json({ error: "Translation is unavailable because no OpenAI API key is configured." });
+    }
+
+    try {
+      const response = await fetchImpl(`${openaiBaseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-4o-mini",
+          temperature: 0,
+          messages: [
+            { role: "system", content: "Translate the supplied civic feedback into natural English. Return only the translation, with no commentary." },
+            { role: "user", content: original },
+          ],
+        }),
+      });
+
+      if (!response.ok) return res.status(502).json({ error: "Translation could not be generated right now." });
+      const body = await response.json();
+      const translation = body?.choices?.[0]?.message?.content;
+      if (typeof translation !== "string" || !translation.trim()) {
+        return res.status(502).json({ error: "Translation service returned an empty result." });
+      }
+      return res.json({ feedbackId: feedback.id, original: feedback.message, translation: translation.trim() });
+    } catch {
+      return res.status(502).json({ error: "Translation could not be generated right now." });
+    }
   });
 
   app.post("/api/feedback", async (req, res) => {

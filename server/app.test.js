@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { createDb } from "./lib/db.js";
 
@@ -86,3 +86,63 @@ describe("CivicVoice baseline API", () => {
     expect(response.status).toBe(403);
   });
 });
+
+describe("admin feedback translation", () => {
+  it("returns a mocked English translation and preserves the original", async () => {
+    const db = await testAppDb();
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "The crossing needs a signal." } }] }),
+    });
+    const app = await createApp({ db, openaiApiKey: "fictional-test-key", fetchImpl, openaiBaseUrl: "https://mock.openai.test/v1" });
+
+    const response = await request(app)
+      .post("/api/feedback/fb-seed-1/translation")
+      .set(await adminHeaders(app));
+
+    expect(response.status).toBe(200);
+    expect(response.body.original).toBe(db.data.feedback[0].message);
+    expect(response.body.translation).toBe("The crossing needs a signal.");
+    expect(db.data.feedback[0].message).toContain("sheltered walkway");
+    expect(fetchImpl).toHaveBeenCalledWith("https://mock.openai.test/v1/chat/completions", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer fictional-test-key" }),
+    }));
+  });
+
+  it("rejects a provider failure without changing the original", async () => {
+    const db = await testAppDb();
+    const original = db.data.feedback[0].message;
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    const app = await createApp({ db, openaiApiKey: "fictional-test-key", fetchImpl });
+
+    const response = await request(app)
+      .post("/api/feedback/fb-seed-1/translation")
+      .set(await adminHeaders(app));
+
+    expect(response.status).toBe(502);
+    expect(response.body.error).toMatch(/translation/i);
+    expect(db.data.feedback[0].message).toBe(original);
+  });
+
+  it("requires the admin role before calling the provider", async () => {
+    const fetchImpl = vi.fn();
+    const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
+
+    const response = await request(app).post("/api/feedback/fb-seed-1/translation");
+
+    expect(response.status).toBe(403);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+async function testAppDb() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
+  return createDb(path.join(directory, "db.json"));
+}
+
+async function adminHeaders(app) {
+  const response = await request(app).post("/api/login").send({
+    nric: "S0000002B", password: "admin123", role: "admin",
+  });
+  return { Authorization: `Bearer ${response.body.token}` };
+}

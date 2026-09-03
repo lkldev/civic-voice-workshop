@@ -19,3 +19,9 @@ export function submitFeedback(feedback) {
 export function getFeedback(session) {
   return api("/api/feedback", { headers: { Authorization: `Bearer ${session.token}` } });
 }
+export function translateFeedback(id, session) {
+  return api(`/api/feedback/${encodeURIComponent(id)}/translation`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+}

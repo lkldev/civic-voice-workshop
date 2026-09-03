@@ -1,13 +1,30 @@
 import { useEffect, useState } from "react";
-import { getFeedback } from "../api";
+import { getFeedback, translateFeedback } from "../api";
 
 export function AdminPage({ session }) {
   const [feedback, setFeedback] = useState([]);
   const [error, setError] = useState("");
+  const [translations, setTranslations] = useState({});
 
   useEffect(() => {
     getFeedback(session).then((response) => setFeedback(response.feedback)).catch((requestError) => setError(requestError.message));
   }, [session]);
+
+  async function handleTranslate(item) {
+    setTranslations((current) => ({ ...current, [item.id]: { status: "loading" } }));
+    try {
+      const response = await translateFeedback(item.id, session);
+      setTranslations((current) => ({
+        ...current,
+        [item.id]: { status: "ready", translation: response.translation },
+      }));
+    } catch (requestError) {
+      setTranslations((current) => ({
+        ...current,
+        [item.id]: { status: "error", error: requestError.message },
+      }));
+    }
+  }
 
   return (
     <main className="page-shell admin-shell">
@@ -23,7 +40,22 @@ export function AdminPage({ session }) {
           <article className="feedback-row" key={item.id}>
             <div>
               <div className="feedback-meta">{item.name} · {new Date(item.createdAt).toLocaleDateString()}</div>
-              <p>{item.message}</p>
+              <div className="feedback-original">
+                <strong>Original</strong>
+                <p>{item.message}</p>
+              </div>
+              <div className="translation-controls">
+                <button className="secondary-button" type="button" onClick={() => handleTranslate(item)} disabled={translations[item.id]?.status === "loading"}>
+                  {translations[item.id]?.status === "loading" ? "Translating…" : "Translate to English"}
+                </button>
+                {translations[item.id]?.status === "error" && <p className="error-message" role="alert">{translations[item.id].error}</p>}
+                {translations[item.id]?.status === "ready" && (
+                  <div className="translation-result">
+                    <strong>English translation</strong>
+                    <p>{translations[item.id].translation}</p>
+                  </div>
+                )}
+              </div>
             </div>
             <span className="status-pill">{item.status}</span>
           </article>

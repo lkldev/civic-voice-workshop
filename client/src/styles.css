@@ -33,6 +33,8 @@ textarea { resize: vertical; line-height: 1.6; }
 .primary-button { border: 0; background: #b2252a; color: white; border-radius: 8px; padding: 13px 18px; font-weight: 700; min-width: 145px; }
 .primary-button:hover { background: #8f1b20; }
 .primary-button:disabled { opacity: .65; cursor: wait; }
+.secondary-button { border: 1px solid #b2252a; background: white; color: #b2252a; border-radius: 8px; padding: 10px 14px; font-weight: 700; }
+.secondary-button:disabled { opacity: .65; cursor: wait; }
 .login-card .primary-button { width: 100%; margin-top: 8px; }
 .error-message { color: #b2252a; font-size: 14px; }
 .demo-help { margin-top: 24px; color: #69747b; font-size: 13px; }
@@ -52,6 +54,11 @@ textarea { resize: vertical; line-height: 1.6; }
 .feedback-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .feedback-row p { margin: 8px 0 0; line-height: 1.55; }
 .feedback-meta { color: #69747b; font-size: 13px; }
+.feedback-original strong, .translation-result strong { color: #38434a; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.translation-controls { display: grid; justify-items: start; gap: 10px; margin-top: 14px; }
+.translation-controls .error-message { margin: 0; }
+.translation-result { padding: 12px 14px; border-left: 3px solid #b2252a; background: #fbfaf7; }
+.translation-result p { margin-bottom: 0; }
 .status-pill { align-self: flex-start; white-space: nowrap; background: #fff1df; color: #9a5b00; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
 @media (max-width: 760px) {
   .split-layout { grid-template-columns: 1fr; }
