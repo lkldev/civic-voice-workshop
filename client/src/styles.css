@@ -51,6 +51,10 @@ textarea { resize: vertical; line-height: 1.6; }
 .feedback-row { display: flex; justify-content: space-between; gap: 24px; padding: 20px 0; border-bottom: 1px solid #eceae4; }
 .feedback-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .feedback-row p { margin: 8px 0 0; line-height: 1.55; }
+.feedback-summary { color: #38434a; }
+.feedback-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.secondary-button { border: 1px solid #b2252a; color: #b2252a; background: white; border-radius: 8px; padding: 8px 12px; font-weight: 700; }
+.secondary-button:disabled { opacity: .65; cursor: wait; }
 .feedback-meta { color: #69747b; font-size: 13px; }
 .status-pill { align-self: flex-start; white-space: nowrap; background: #fff1df; color: #9a5b00; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
 .status-select { align-self: flex-start; border: 1px solid #e2c88f; border-radius: 999px; background: #fff1df; color: #9a5b00; padding: 5px 10px; font-size: 12px; font-weight: 700; }

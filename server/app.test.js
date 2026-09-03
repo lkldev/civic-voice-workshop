@@ -12,6 +12,20 @@ async function testApp(options = {}) {
   return createApp({ db, ...options });
 }
 
+async function testContext(options = {}) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
+  const db = await createDb(path.join(directory, "db.json"));
+  const app = await createApp({ db, ...options });
+  return { app, db };
+}
+
+async function adminAuthorization(app) {
+  const login = await request(app).post("/api/login").send({
+    nric: "S0000002B", password: "admin123", role: "admin",
+  });
+  return `Bearer ${login.body.token}`;
+}
+
 describe("CivicVoice baseline API", () => {
   it("creates a missing datastore directory on first use", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
@@ -70,7 +84,7 @@ describe("CivicVoice baseline API", () => {
     expect(response.status).toBe(200);
   });
 
-  it("accepts feedback", async () => {
+  it("accepts feedback and stores the deterministic fallback category", async () => {
     const app = await testApp();
     const response = await request(app).post("/api/feedback").send({
       nric: "S0000001A", name: "Aisha Rahman", message: "Please add more benches.",
@@ -115,7 +129,7 @@ describe("CivicVoice baseline API", () => {
     }
   });
 
-  it("blocks the feedback list without the admin role header", async () => {
+  it("blocks the feedback list without an admin session", async () => {
     const app = await testApp();
     const response = await request(app).get("/api/feedback");
     expect(response.status).toBe(403);
@@ -123,13 +137,11 @@ describe("CivicVoice baseline API", () => {
 
   it("allows the admin session to read feedback", async () => {
     const app = await testApp();
-    const login = await request(app).post("/api/login").send({
-      nric: "S0000002B", password: "admin123", role: "admin",
-    });
+    const authorization = await adminAuthorization(app);
 
     const response = await request(app)
       .get("/api/feedback")
-      .set("Authorization", `Bearer ${login.body.token}`);
+      .set("Authorization", authorization);
 
     expect(response.status).toBe(200);
     expect(response.body.feedback).toHaveLength(1);
@@ -166,13 +178,11 @@ describe("CivicVoice baseline API", () => {
 
   it("allows an admin to update and persist feedback status", async () => {
     const app = await testApp();
-    const login = await request(app).post("/api/login").send({
-      nric: "S0000002B", password: "admin123", role: "admin",
-    });
+    const authorization = await adminAuthorization(app);
 
     const response = await request(app)
       .patch("/api/feedback/fb-seed-1/status")
-      .set("Authorization", `Bearer ${login.body.token}`)
+      .set("Authorization", authorization)
       .send({ status: "In review" });
 
     expect(response.status).toBe(200);
@@ -182,13 +192,61 @@ describe("CivicVoice baseline API", () => {
 
   it("rejects invalid feedback statuses", async () => {
     const app = await testApp();
-    const login = await request(app).post("/api/login").send({
-      nric: "S0000002B", password: "admin123", role: "admin",
-    });
+    const authorization = await adminAuthorization(app);
     const response = await request(app)
       .patch("/api/feedback/fb-seed-1/status")
-      .set("Authorization", `Bearer ${login.body.token}`)
+      .set("Authorization", authorization)
       .send({ status: "Archived" });
     expect(response.status).toBe(400);
+  });
+
+  it("generates and caches a mocked summary for long feedback", async () => {
+    const summarizeFeedback = vi.fn().mockResolvedValue("Residents need a safer, better-lit walkway.");
+    const { app, db } = await testContext({ summarizeFeedback });
+    const longMessage = "Residents report that the walkway beside the community library is difficult to use after sunset because several lights are broken and the path becomes crowded with bicycles. ".repeat(2);
+    db.data.feedback.unshift({
+      id: "fb-long-1", nric: "S0000001A", name: "Aisha Rahman", message: longMessage,
+      category: "Other", status: "New", createdAt: "2026-08-29T09:14:00.000Z",
+    });
+    const authorization = await adminAuthorization(app);
+
+    const first = await request(app).post("/api/feedback/fb-long-1/summary").set("Authorization", authorization);
+    const second = await request(app).post("/api/feedback/fb-long-1/summary").set("Authorization", authorization);
+
+    expect(first.status).toBe(200);
+    expect(first.body.summary).toBe("Residents need a safer, better-lit walkway.");
+    expect(first.body.cached).toBe(false);
+    expect(second.body.summary).toBe(first.body.summary);
+    expect(second.body.cached).toBe(true);
+    expect(summarizeFeedback).toHaveBeenCalledTimes(1);
+    expect(db.data.feedback.find((item) => item.id === "fb-long-1").summary).toBe(first.body.summary);
+  });
+
+  it("does not call the summarizer for short feedback", async () => {
+    const summarizeFeedback = vi.fn();
+    const app = await testApp({ summarizeFeedback });
+    const authorization = await adminAuthorization(app);
+
+    const response = await request(app).post("/api/feedback/fb-seed-1/summary").set("Authorization", authorization);
+
+    expect(response.status).toBe(400);
+    expect(summarizeFeedback).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original feedback in a model failure response", async () => {
+    const summarizeFeedback = vi.fn().mockRejectedValue(new Error("fictional provider outage"));
+    const { app, db } = await testContext({ summarizeFeedback });
+    const longMessage = "The same fictional community walkway has broken lights and is hard to navigate after sunset. ".repeat(4);
+    db.data.feedback.unshift({
+      id: "fb-long-failure", nric: "S0000001A", name: "Aisha Rahman", message: longMessage,
+      category: "Other", status: "New", createdAt: "2026-08-29T09:14:00.000Z",
+    });
+    const authorization = await adminAuthorization(app);
+
+    const response = await request(app).post("/api/feedback/fb-long-failure/summary").set("Authorization", authorization);
+
+    expect(response.status).toBe(502);
+    expect(response.body.feedback.message).toBe(longMessage);
+    expect(db.data.feedback.find((item) => item.id === "fb-long-failure").summary).toBeUndefined();
   });
 });
