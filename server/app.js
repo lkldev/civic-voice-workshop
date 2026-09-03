@@ -55,7 +55,21 @@ export async function createApp(options = {}) {
     if (req.user.role !== "admin") {
       return res.status(403).json({ error: "Admin access required." });
     }
-    return res.json({ feedback: db.data.feedback });
+    const pageSize = 10;
+    const requestedPage = Number.parseInt(req.query.page ?? "1", 10);
+    const page = Number.isFinite(requestedPage) ? Math.max(1, requestedPage) : 1;
+    const { category, status } = req.query;
+    const filtered = db.data.feedback.filter((item) => (
+      (!category || item.category === category) && (!status || item.status === status)
+    ));
+    const totalItems = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const currentPage = Math.min(page, totalPages);
+    const start = (currentPage - 1) * pageSize;
+    return res.json({
+      feedback: filtered.slice(start, start + pageSize),
+      pagination: { page: currentPage, pageSize, totalItems, totalPages },
+    });
   });
 
   app.patch("/api/feedback/:id/status", requireSession, async (req, res) => {

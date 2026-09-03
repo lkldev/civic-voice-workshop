@@ -176,6 +176,25 @@ describe("CivicVoice baseline API", () => {
     expect(response.status).toBe(403);
   });
 
+  it("returns ten feedback items per page and clamps page bounds", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    app.locals.db.data.feedback = Array.from({ length: 12 }, (_, index) => ({
+      id: `page-${index + 1}`, category: "Estate", status: "New",
+    }));
+
+    const response = await request(app)
+      .get("/api/feedback?page=2")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback).toHaveLength(2);
+    expect(response.body.pagination).toEqual({ page: 2, pageSize: 10, totalItems: 12, totalPages: 2 });
+    expect(response.body.feedback[0].id).toBe("page-11");
+  });
+
   it("allows an admin to update and persist feedback status", async () => {
     const app = await testApp();
     const authorization = await adminAuthorization(app);
