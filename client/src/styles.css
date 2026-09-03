@@ -50,6 +50,10 @@ textarea { resize: vertical; line-height: 1.6; }
 .list-header span { color: #69747b; font-size: 14px; }
 .feedback-row { display: flex; justify-content: space-between; gap: 24px; padding: 20px 0; border-bottom: 1px solid #eceae4; }
 .feedback-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.filter-bar { display: flex; align-items: end; gap: 18px; margin-bottom: 20px; }
+.filter-bar label { flex: 1; margin: 0; }
+.filter-bar select { width: 100%; border: 1px solid #d5d2cb; border-radius: 8px; background: white; padding: 13px 14px; }
+.filter-bar .text-button { padding: 13px 0; white-space: nowrap; }
 .feedback-row p { margin: 8px 0 0; line-height: 1.55; }
 .feedback-meta { color: #69747b; font-size: 13px; }
 .status-pill { align-self: flex-start; white-space: nowrap; background: #fff1df; color: #9a5b00; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
@@ -62,4 +66,6 @@ textarea { resize: vertical; line-height: 1.6; }
   .signed-in { display: none; }
   .form-footer { align-items: stretch; flex-direction: column; }
   .form-footer .primary-button { width: 100%; }
+  .filter-bar { align-items: stretch; flex-direction: column; gap: 8px; }
+  .filter-bar .text-button { padding: 8px 0; }
 }

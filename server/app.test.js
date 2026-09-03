@@ -85,4 +85,23 @@ describe("CivicVoice baseline API", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("filters feedback by category and status together", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    app.locals.db.data.feedback = [
+      { id: "match", category: "Transport", status: "Closed" },
+      { id: "wrong-status", category: "Transport", status: "New" },
+      { id: "wrong-category", category: "Estate", status: "Closed" },
+    ];
+
+    const response = await request(app)
+      .get("/api/feedback?category=Transport&status=Closed")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback.map((item) => item.id)).toEqual(["match"]);
+  });
 });
