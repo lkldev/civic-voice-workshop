@@ -32,3 +32,10 @@ export function summarizeFeedback(id, session) {
     headers: { Authorization: `Bearer ${session.token}` },
   });
 }
+export function synthesizeSpeech(text, session) {
+  return api("/api/feedback/tts", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.token}` },
+    body: JSON.stringify({ text }),
+  });
+}
