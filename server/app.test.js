@@ -42,4 +42,47 @@ describe("CivicVoice baseline API", () => {
     const response = await request(app).get("/api/feedback");
     expect(response.status).toBe(403);
   });
+
+  it("allows the admin session to read feedback", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+
+    const response = await request(app)
+      .get("/api/feedback")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback).toHaveLength(1);
+  });
+
+  it("does not trust a forged role header for a citizen", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000001A", password: "citizen123", role: "citizen",
+    });
+
+    const response = await request(app)
+      .get("/api/feedback")
+      .set("Authorization", `Bearer ${login.body.token}`)
+      .set("x-user-role", "admin");
+
+    expect(response.status).toBe(403);
+  });
+
+  it("issues an opaque token and rejects invalid tokens", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000001A", password: "citizen123", role: "citizen",
+    });
+    const legacyToken = Buffer.from("S0000001A:citizen").toString("base64");
+    expect(login.body.token).not.toBe(legacyToken);
+
+    const response = await request(app)
+      .get("/api/feedback")
+      .set("Authorization", "Bearer invalid-session-token");
+
+    expect(response.status).toBe(403);
+  });
 });
