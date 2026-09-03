@@ -16,8 +16,13 @@ export function login(credentials) {
 export function submitFeedback(feedback) {
   return api("/api/feedback", { method: "POST", body: JSON.stringify(feedback) });
 }
-export function getFeedback(session) {
-  return api("/api/feedback", { headers: { Authorization: `Bearer ${session.token}` } });
+export function getFeedback(session, filters = {}) {
+  const query = new URLSearchParams();
+  if (filters.page) query.set("page", filters.page);
+  if (filters.category) query.set("category", filters.category);
+  if (filters.status) query.set("status", filters.status);
+  const suffix = query.toString() ? `?${query}` : "";
+  return api(`/api/feedback${suffix}`, { headers: { Authorization: `Bearer ${session.token}` } });
 }
 export function updateFeedbackStatus(session, id, status) {
   return api(`/api/feedback/${id}/status`, {
