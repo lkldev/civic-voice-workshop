@@ -139,4 +139,32 @@ describe("CivicVoice baseline API", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("allows an admin to update and persist feedback status", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+
+    const response = await request(app)
+      .patch("/api/feedback/fb-seed-1/status")
+      .set("Authorization", `Bearer ${login.body.token}`)
+      .send({ status: "In review" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback.status).toBe("In review");
+    expect(app.locals.db.data.feedback[0].status).toBe("In review");
+  });
+
+  it("rejects invalid feedback statuses", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    const response = await request(app)
+      .patch("/api/feedback/fb-seed-1/status")
+      .set("Authorization", `Bearer ${login.body.token}`)
+      .send({ status: "Archived" });
+    expect(response.status).toBe(400);
+  });
 });
