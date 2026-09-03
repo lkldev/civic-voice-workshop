@@ -7,6 +7,7 @@ export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
   const sessions = new Map();
   const app = express();
+  app.locals.db = db;
   app.use(cors());
   app.use(express.json());
 
@@ -39,7 +40,10 @@ export async function createApp(options = {}) {
     if (req.user.role !== "admin") {
       return res.status(403).json({ error: "Admin access required." });
     }
-    return res.json({ feedback: db.data.feedback });
+    const feedback = [...db.data.feedback].sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    );
+    return res.json({ feedback });
   });
 
   app.post("/api/feedback", async (req, res) => {

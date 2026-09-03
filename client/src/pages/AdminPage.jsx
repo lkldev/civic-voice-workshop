@@ -6,7 +6,11 @@ export function AdminPage({ session }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    getFeedback(session).then((response) => setFeedback(response.feedback)).catch((requestError) => setError(requestError.message));
+    getFeedback(session)
+      .then((response) => setFeedback([...response.feedback].sort(
+        (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      )))
+      .catch((requestError) => setError(requestError.message));
   }, [session]);
 
   return (

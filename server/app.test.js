@@ -85,4 +85,23 @@ describe("CivicVoice baseline API", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("returns stored feedback newest first", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    const db = app.locals.db;
+    db.data.feedback = [
+      { id: "older", createdAt: "2026-08-01T00:00:00.000Z" },
+      { id: "newer", createdAt: "2026-09-01T00:00:00.000Z" },
+    ];
+
+    const response = await request(app)
+      .get("/api/feedback")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback.map((item) => item.id)).toEqual(["newer", "older"]);
+  });
 });
