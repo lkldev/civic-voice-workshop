@@ -250,3 +250,72 @@ describe("CivicVoice baseline API", () => {
     expect(db.data.feedback.find((item) => item.id === "fb-long-failure").summary).toBeUndefined();
   });
 });
+
+describe("feedback text-to-speech", () => {
+  it("requires a session before calling the speech provider", async () => {
+    const fetchImpl = vi.fn();
+    const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
+
+    const response = await request(app).post("/api/feedback/tts").send({ text: "Please add a sheltered bench." });
+
+    expect(response.status).toBe(403);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns mocked audio without exposing the provider to the browser", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({ "content-type": "audio/mpeg" }),
+      arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+    });
+    const app = await createApp({
+      db: (await testAppDb()),
+      openaiApiKey: "fictional-test-key",
+      fetchImpl,
+      openaiBaseUrl: "https://mock.openai.test/v1",
+    });
+
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "Please add a sheltered bench." });
+
+    expect(response.status).toBe(200);
+    expect(response.body.contentType).toBe("audio/mpeg");
+    expect(response.body.audio).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+    expect(fetchImpl).toHaveBeenCalledWith("https://mock.openai.test/v1/audio/speech", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer fictional-test-key" }),
+    }));
+    expect(JSON.stringify(response.body)).not.toContain("fictional-test-key");
+  });
+
+  it("rejects blank feedback without synthesizing it", async () => {
+    const fetchImpl = vi.fn();
+    const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
+
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "  \n\t" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/feedback/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("returns a clear failure when the speech provider fails", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
+
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "The crossing needs a signal." });
+
+    expect(response.status).toBe(502);
+    expect(response.body.error).toMatch(/text-to-speech/i);
+  });
+});
+
+async function testAppDb() {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
+  return createDb(path.join(directory, "db.json"));
+}
+
+async function citizenHeaders(app) {
+  const response = await request(app).post("/api/login").send({
+    nric: "S0000001A", password: "citizen123", role: "citizen",
+  });
+  return { Authorization: `Bearer ${response.body.token}` };
+}

@@ -10,7 +10,7 @@ export default function App() {
     <>
       <Header user={session?.user} onLogout={() => setSession(null)} />
       {!session && <LoginPage onLogin={setSession} />}
-      {session?.user.role === "citizen" && <CitizenPage user={session.user} />}
+      {session?.user.role === "citizen" && <CitizenPage session={session} />}
       {session?.user.role === "admin" && <AdminPage session={session} />}
     </>
   );

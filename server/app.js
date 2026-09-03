@@ -18,6 +18,9 @@ export async function createApp(options = {}) {
   const sessions = new Map();
   const categorize = options.categorizeFeedback ?? categorizeFeedback;
   const summarize = options.summarizeFeedback ?? summarizeFeedback;
+  const openaiApiKey = options.openaiApiKey ?? process.env.OPENAI_API_KEY;
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const openaiBaseUrl = (options.openaiBaseUrl ?? process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
   const app = express();
   app.locals.db = db;
   app.use(cors());
@@ -116,6 +119,41 @@ export async function createApp(options = {}) {
     db.data.feedback.unshift(feedback);
     await db.write();
     return res.status(201).json({ feedback });
+  });
+
+  app.post("/api/feedback/tts", requireSession, async (req, res) => {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text) return res.status(400).json({ error: "Please enter feedback to read aloud." });
+    if (!openaiApiKey) {
+      return res.status(503).json({ error: "Text-to-speech is unavailable because no OpenAI API key is configured." });
+    }
+
+    try {
+      const response = await fetchImpl(`${openaiBaseUrl}/audio/speech`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
+          voice: process.env.OPENAI_TTS_VOICE ?? "alloy",
+          input: text,
+          response_format: "mp3",
+        }),
+      });
+
+      if (!response.ok) {
+        return res.status(502).json({ error: "Text-to-speech could not be generated right now." });
+      }
+
+      const audio = Buffer.from(await response.arrayBuffer()).toString("base64");
+      if (!audio) return res.status(502).json({ error: "Text-to-speech returned empty audio." });
+      const contentType = response.headers?.get?.("content-type") || "audio/mpeg";
+      return res.json({ audio, contentType });
+    } catch {
+      return res.status(502).json({ error: "Text-to-speech could not be generated right now." });
+    }
   });
 
   return app;
