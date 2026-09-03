@@ -275,7 +275,7 @@ describe("feedback text-to-speech", () => {
       openaiBaseUrl: "https://mock.openai.test/v1",
     });
 
-    const response = await request(app).post("/api/feedback/tts").send({ text: "Please add a sheltered bench." });
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "Please add a sheltered bench." });
 
     expect(response.status).toBe(200);
     expect(response.body.contentType).toBe("audio/mpeg");
@@ -290,7 +290,7 @@ describe("feedback text-to-speech", () => {
     const fetchImpl = vi.fn();
     const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
 
-    const response = await request(app).post("/api/feedback/tts").send({ text: "  \n\t" });
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "  \n\t" });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toMatch(/feedback/i);
@@ -301,7 +301,7 @@ describe("feedback text-to-speech", () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
     const app = await createApp({ db: await testAppDb(), openaiApiKey: "fictional-test-key", fetchImpl });
 
-    const response = await request(app).post("/api/feedback/tts").send({ text: "The crossing needs a signal." });
+    const response = await request(app).post("/api/feedback/tts").set(await citizenHeaders(app)).send({ text: "The crossing needs a signal." });
 
     expect(response.status).toBe(502);
     expect(response.body.error).toMatch(/text-to-speech/i);
@@ -311,4 +311,11 @@ describe("feedback text-to-speech", () => {
 async function testAppDb() {
   const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
   return createDb(path.join(directory, "db.json"));
+}
+
+async function citizenHeaders(app) {
+  const response = await request(app).post("/api/login").send({
+    nric: "S0000001A", password: "citizen123", role: "citizen",
+  });
+  return { Authorization: `Bearer ${response.body.token}` };
 }
