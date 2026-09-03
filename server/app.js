@@ -2,7 +2,13 @@ import crypto from "node:crypto";
 import express from "express";
 import cors from "cors";
 import { createDb } from "./lib/db.js";
-import { categorizeFeedback, fallbackCategory, normalizeCategory } from "./lib/openai.js";
+import {
+  categorizeFeedback,
+  fallbackCategory,
+  normalizeCategory,
+  normalizeSummary,
+  summarizeFeedback,
+} from "./lib/openai.js";
 import { verifyPassword } from "./lib/passwords.js";
 
 export const FEEDBACK_STATUSES = ["New", "In review", "Closed"];
@@ -11,6 +17,7 @@ export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
   const sessions = new Map();
   const categorize = options.categorizeFeedback ?? categorizeFeedback;
+  const summarize = options.summarizeFeedback ?? summarizeFeedback;
   const app = express();
   app.locals.db = db;
   app.use(cors());
@@ -63,6 +70,34 @@ export async function createApp(options = {}) {
     return res.json({ feedback });
   });
 
+  app.post("/api/feedback/:id/summary", requireSession, async (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    const feedback = db.data.feedback.find((item) => item.id === req.params.id);
+    if (!feedback) return res.status(404).json({ error: "Feedback not found." });
+    if (typeof feedback.message !== "string" || feedback.message.length <= 200) {
+      return res.status(400).json({ error: "Only feedback longer than 200 characters can be summarized.", feedback });
+    }
+    if (typeof feedback.summary === "string" && feedback.summary.trim()) {
+      return res.json({ feedback, summary: feedback.summary, cached: true });
+    }
+
+    try {
+      const summary = normalizeSummary(await summarize(feedback.message));
+      if (!summary) throw new Error("Summarizer returned an empty summary.");
+      feedback.summary = summary;
+      await db.write();
+      return res.json({ feedback, summary, cached: false });
+    } catch {
+      return res.status(502).json({
+        error: "Summary is unavailable right now. The original feedback is still available.",
+        feedback,
+      });
+    }
+  });
+
   app.post("/api/feedback", async (req, res) => {
     const { nric, name, message } = req.body ?? {};
     if (typeof message !== "string" || !message.trim()) {
@@ -73,7 +108,7 @@ export async function createApp(options = {}) {
       category = normalizeCategory(await categorize(message));
     } catch {
       category = null;
-    
+    }
     const feedback = {
       id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",
       createdAt: new Date().toISOString(),

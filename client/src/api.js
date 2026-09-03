@@ -26,3 +26,9 @@ export function updateFeedbackStatus(session, id, status) {
     body: JSON.stringify({ status }),
   });
 }
+export function summarizeFeedback(id, session) {
+  return api(`/api/feedback/${encodeURIComponent(id)}/summary`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+}

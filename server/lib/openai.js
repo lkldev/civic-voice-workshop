@@ -78,3 +78,49 @@ export async function categorizeFeedback(
     return fallbackCategory(message);
   }
 }
+
+function summaryFromResponse(body) {
+  const content = body?.choices?.[0]?.message?.content;
+  return typeof content === "string" ? normalizeSummary(content) : null;
+}
+
+export function normalizeSummary(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+
+  const sentenceEnd = text.search(/[.!?](?:\s|$)/);
+  const sentence = sentenceEnd >= 0 ? text.slice(0, sentenceEnd + 1) : `${text}.`;
+  return sentence.trim();
+}
+
+export async function summarizeFeedback(
+  message,
+  { apiKey = process.env.OPENAI_API_KEY, fetchImpl = fetch } = {},
+) {
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured.");
+
+  const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      temperature: 0,
+      messages: [
+        {
+          role: "system",
+          content: "Summarize the civic feedback in exactly one concise sentence. Preserve the main issue and avoid adding facts.",
+        },
+        { role: "user", content: message },
+      ],
+    }),
+  });
+
+  if (!response.ok) throw new Error(`OpenAI summary request failed (${response.status}).`);
+  const summary = summaryFromResponse(await response.json());
+  if (!summary) throw new Error("OpenAI returned an empty summary.");
+  return summary;
+}
