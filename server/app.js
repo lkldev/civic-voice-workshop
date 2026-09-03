@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import express from "express";
 import cors from "cors";
 import { createDb } from "./lib/db.js";
+import { categorizeFeedback, fallbackCategory, normalizeCategory } from "./lib/openai.js";
 import { verifyPassword } from "./lib/passwords.js";
 
 export const FEEDBACK_STATUSES = ["New", "In review", "Closed"];
@@ -9,6 +10,7 @@ export const FEEDBACK_STATUSES = ["New", "In review", "Closed"];
 export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
   const sessions = new Map();
+  const categorize = options.categorizeFeedback ?? categorizeFeedback;
   const app = express();
   app.locals.db = db;
   app.use(cors());
@@ -66,8 +68,14 @@ export async function createApp(options = {}) {
     if (typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "Please enter feedback." });
     }
+    let category;
+    try {
+      category = normalizeCategory(await categorize(message));
+    } catch {
+      category = null;
+    
     const feedback = {
-      id: crypto.randomUUID(), nric, name, message, category: "General", status: "New",
+      id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",
       createdAt: new Date().toISOString(),
     };
     db.data.feedback.unshift(feedback);

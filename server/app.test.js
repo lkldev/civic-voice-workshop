@@ -2,14 +2,14 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { createDb } from "./lib/db.js";
 
-async function testApp() {
+async function testApp(options = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "civic-voice-"));
   const db = await createDb(path.join(directory, "db.json"));
-  return createApp({ db });
+  return createApp({ db, ...options });
 }
 
 describe("CivicVoice baseline API", () => {
@@ -77,6 +77,30 @@ describe("CivicVoice baseline API", () => {
     });
     expect(response.status).toBe(201);
     expect(response.body.feedback.message).toBe("Please add more benches.");
+    expect(response.body.feedback.category).toBe("Other");
+  });
+
+  it("stores a category returned by the mocked model", async () => {
+    const categorizeFeedback = vi.fn().mockResolvedValue("Transport");
+    const app = await testApp({ categorizeFeedback });
+    const response = await request(app).post("/api/feedback").send({
+      nric: "S0000001A", name: "Aisha Rahman", message: "The bus stop needs a shelter.",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.feedback.category).toBe("Transport");
+    expect(categorizeFeedback).toHaveBeenCalledWith("The bus stop needs a shelter.");
+  });
+
+  it("uses deterministic categorization when the model fails", async () => {
+    const categorizeFeedback = vi.fn().mockRejectedValue(new Error("fictional provider outage"));
+    const app = await testApp({ categorizeFeedback });
+    const response = await request(app).post("/api/feedback").send({
+      nric: "S0000001A", name: "Aisha Rahman", message: "The MRT station needs clearer signs.",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.feedback.category).toBe("Transport");
   });
 
   it("rejects blank or whitespace-only feedback", async () => {
