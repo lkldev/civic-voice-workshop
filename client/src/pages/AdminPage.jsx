@@ -1,13 +1,27 @@
 import { useEffect, useState } from "react";
-import { getFeedback } from "../api";
+import { getFeedback, updateFeedbackStatus } from "../api";
 
 export function AdminPage({ session }) {
   const [feedback, setFeedback] = useState([]);
   const [error, setError] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
 
   useEffect(() => {
     getFeedback(session).then((response) => setFeedback(response.feedback)).catch((requestError) => setError(requestError.message));
   }, [session]);
+
+  async function handleStatusChange(id, status) {
+    setError("");
+    setUpdatingId(id);
+    try {
+      const response = await updateFeedbackStatus(session, id, status);
+      setFeedback((items) => items.map((item) => item.id === id ? response.feedback : item));
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUpdatingId("");
+    }
+  }
 
   return (
     <main className="page-shell admin-shell">
@@ -25,7 +39,17 @@ export function AdminPage({ session }) {
               <div className="feedback-meta">{item.name} · {new Date(item.createdAt).toLocaleDateString()}</div>
               <p>{item.message}</p>
             </div>
-            <span className="status-pill">{item.status}</span>
+            <select
+              className="status-select"
+              value={item.status}
+              disabled={updatingId === item.id}
+              onChange={(event) => handleStatusChange(item.id, event.target.value)}
+              aria-label={`Status for feedback from ${item.name}`}
+            >
+              <option>New</option>
+              <option>In review</option>
+              <option>Closed</option>
+            </select>
           </article>
         ))}
       </section>

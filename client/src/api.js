@@ -19,3 +19,10 @@ export function submitFeedback(feedback) {
 export function getFeedback(session) {
   return api("/api/feedback", { headers: { Authorization: `Bearer ${session.token}` } });
 }
+export function updateFeedbackStatus(session, id, status) {
+  return api(`/api/feedback/${id}/status`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${session.token}` },
+    body: JSON.stringify({ status }),
+  });
+}
