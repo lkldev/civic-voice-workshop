@@ -169,7 +169,6 @@ describe("CivicVoice baseline API", () => {
     const login = await request(app).post("/api/login").send({
       nric: "S0000002B", password: "admin123", role: "admin",
     });
-
     const response = await request(app)
       .patch("/api/feedback/fb-seed-1/status")
       .set("Authorization", `Bearer ${login.body.token}`)
@@ -190,5 +189,21 @@ describe("CivicVoice baseline API", () => {
       .set("Authorization", `Bearer ${login.body.token}`)
       .send({ status: "Archived" });
     expect(response.status).toBe(400);
+  });
+
+  it("returns a focused feedback detail for an admin", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    const response = await request(app)
+      .get("/api/feedback/fb-seed-1")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.feedback).toMatchObject({
+      id: "fb-seed-1", nric: "S0000001A", name: "Aisha Rahman", status: "New",
+    });
+    expect(response.body.feedback.message).toContain("sheltered walkway");
   });
 });
