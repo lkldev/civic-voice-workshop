@@ -7,6 +7,8 @@ import { verifyPassword } from "./lib/passwords.js";
 
 export const FEEDBACK_STATUSES = ["New", "In review", "Closed"];
 
+export const FEEDBACK_CATEGORIES = ["Estate", "Transport", "Environment", "Other"];
+
 export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
   const sessions = new Map();
@@ -64,18 +66,26 @@ export async function createApp(options = {}) {
   });
 
   app.post("/api/feedback", async (req, res) => {
-    const { nric, name, message } = req.body ?? {};
+    const { nric, name, message, category } = req.body ?? {};
     if (typeof message !== "string" || !message.trim()) {
       return res.status(400).json({ error: "Please enter feedback." });
     }
-    let category;
-    try {
-      category = normalizeCategory(await categorize(message));
-    } catch {
-      category = null;
-    
+    let chosenCategory = category;
+    if (chosenCategory !== undefined) {
+      if (!FEEDBACK_CATEGORIES.includes(chosenCategory)) {
+        return res.status(400).json({ error: "Please choose a valid feedback category." });
+      }
+    } else {
+      let modelCategory;
+      try {
+        modelCategory = normalizeCategory(await categorize(message));
+      } catch {
+        modelCategory = null;
+      }
+      chosenCategory = modelCategory ?? fallbackCategory(message);
+    }
     const feedback = {
-      id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",
+      id: crypto.randomUUID(), nric, name, message, category: chosenCategory, status: "New",
       createdAt: new Date().toISOString(),
     };
     db.data.feedback.unshift(feedback);

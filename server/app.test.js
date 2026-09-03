@@ -73,11 +73,11 @@ describe("CivicVoice baseline API", () => {
   it("accepts feedback", async () => {
     const app = await testApp();
     const response = await request(app).post("/api/feedback").send({
-      nric: "S0000001A", name: "Aisha Rahman", message: "Please add more benches.",
+      nric: "S0000001A", name: "Aisha Rahman", message: "Please add more benches.", category: "Transport",
     });
     expect(response.status).toBe(201);
     expect(response.body.feedback.message).toBe("Please add more benches.");
-    expect(response.body.feedback.category).toBe("Other");
+    expect(response.body.feedback.category).toBe("Transport");
   });
 
   it("stores a category returned by the mocked model", async () => {
@@ -101,6 +101,15 @@ describe("CivicVoice baseline API", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.feedback.category).toBe("Transport");
+  });
+
+  it("rejects an unknown feedback category", async () => {
+    const app = await testApp();
+    const response = await request(app).post("/api/feedback").send({
+      nric: "S0000001A", name: "Aisha Rahman", message: "Please add more benches.", category: "Secret",
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("valid feedback category");
   });
 
   it("rejects blank or whitespace-only feedback", async () => {
