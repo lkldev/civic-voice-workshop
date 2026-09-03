@@ -26,3 +26,6 @@ export function updateFeedbackStatus(session, id, status) {
     body: JSON.stringify({ status }),
   });
 }
+export function getFeedbackDetail(session, id) {
+  return api(`/api/feedback/${id}`, { headers: { Authorization: `Bearer ${session.token}` } });
+}

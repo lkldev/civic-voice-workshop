@@ -63,6 +63,15 @@ export async function createApp(options = {}) {
     return res.json({ feedback });
   });
 
+  app.get("/api/feedback/:id", requireSession, (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+    const feedback = db.data.feedback.find((item) => item.id === req.params.id);
+    if (!feedback) return res.status(404).json({ error: "Feedback not found." });
+    return res.json({ feedback });
+  });
+
   app.post("/api/feedback", async (req, res) => {
     const { nric, name, message } = req.body ?? {};
     if (typeof message !== "string" || !message.trim()) {
@@ -73,7 +82,7 @@ export async function createApp(options = {}) {
       category = normalizeCategory(await categorize(message));
     } catch {
       category = null;
-    
+    }
     const feedback = {
       id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",
       createdAt: new Date().toISOString(),

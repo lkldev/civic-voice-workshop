@@ -54,6 +54,15 @@ textarea { resize: vertical; line-height: 1.6; }
 .feedback-meta { color: #69747b; font-size: 13px; }
 .status-pill { align-self: flex-start; white-space: nowrap; background: #fff1df; color: #9a5b00; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
 .status-select { align-self: flex-start; border: 1px solid #e2c88f; border-radius: 999px; background: #fff1df; color: #9a5b00; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+.detail-link { padding: 0; margin-top: 4px; font-size: 13px; }
+.back-button { padding: 0; margin-bottom: 28px; }
+.detail-card { max-width: 760px; }
+.detail-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px 28px; margin: 0; }
+.detail-fields div { border-bottom: 1px solid #eceae4; padding-bottom: 12px; }
+.detail-fields dt { color: #69747b; font-size: 12px; margin-bottom: 5px; }
+.detail-fields dd { margin: 0; }
+.detail-message { margin-top: 28px; border-top: 1px solid #eceae4; padding-top: 22px; }
+.detail-message p { line-height: 1.6; white-space: pre-wrap; }
 @media (max-width: 760px) {
   .split-layout { grid-template-columns: 1fr; }
   .intro-panel { min-height: 360px; padding: 58px 8vw; }
@@ -63,4 +72,5 @@ textarea { resize: vertical; line-height: 1.6; }
   .signed-in { display: none; }
   .form-footer { align-items: stretch; flex-direction: column; }
   .form-footer .primary-button { width: 100%; }
+  .detail-fields { grid-template-columns: 1fr; }
 }
