@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { createDb } from "./lib/db.js";
 import { categorizeFeedback, fallbackCategory, normalizeCategory } from "./lib/openai.js";
+import { verifyPassword } from "./lib/passwords.js";
 
 export async function createApp(options = {}) {
   const db = options.db ?? (await createDb());
@@ -28,7 +29,7 @@ export async function createApp(options = {}) {
   app.post("/api/login", (req, res) => {
     const { nric, password, role } = req.body ?? {};
     const user = db.data.users.find(
-      (candidate) => candidate.nric === nric && candidate.password === password && candidate.role === role,
+      (candidate) => candidate.nric === nric && verifyPassword(password, candidate.passwordHash) && candidate.role === role,
     );
     if (!user) return res.status(401).json({ error: "Invalid NRIC, password, or sign-in mode." });
 
@@ -46,13 +47,15 @@ export async function createApp(options = {}) {
 
   app.post("/api/feedback", async (req, res) => {
     const { nric, name, message } = req.body ?? {};
-    if (!message) return res.status(400).json({ error: "Please enter feedback." });
+    if (typeof message !== "string" || !message.trim()) {
+      return res.status(400).json({ error: "Please enter feedback." });
+    }
     let category;
     try {
       category = normalizeCategory(await categorize(message));
     } catch {
       category = null;
-    }
+    
     const feedback = {
       id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",
       createdAt: new Date().toISOString(),
