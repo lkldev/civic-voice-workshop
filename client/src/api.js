@@ -26,3 +26,16 @@ export function updateFeedbackStatus(session, id, status) {
     body: JSON.stringify({ status }),
   });
 }
+export async function exportFeedback(session, filters = {}) {
+  const query = new URLSearchParams();
+  if (filters.category) query.set("category", filters.category);
+  if (filters.status) query.set("status", filters.status);
+  const response = await fetch(`${API_URL}/api/feedback/export.csv?${query}`, {
+    headers: { Authorization: `Bearer ${session.token}` },
+  });
+  if (!response.ok) {
+    const body = await response.json();
+    throw new Error(body.error ?? "Something went wrong.");
+  }
+  return response.blob();
+}

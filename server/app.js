@@ -48,6 +48,24 @@ export async function createApp(options = {}) {
     return res.json({ feedback: db.data.feedback });
   });
 
+  app.get("/api/feedback/export.csv", requireSession, (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+    const { category, status } = req.query;
+    const rows = db.data.feedback.filter((item) => (
+      (!category || item.category === category) && (!status || item.status === status)
+    ));
+    const escapeCsv = (value) => `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+    const headers = ["id", "nric", "name", "message", "category", "status", "createdAt"];
+    const csv = [headers, ...rows.map((item) => headers.map((header) => item[header]))]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\r\n");
+    res.type("text/csv");
+    res.attachment("feedback.csv");
+    return res.send(`${csv}\r\n`);
+  });
+
   app.patch("/api/feedback/:id/status", requireSession, async (req, res) => {
     if (req.user.role !== "admin") {
       return res.status(403).json({ error: "Admin access required." });
@@ -73,6 +91,7 @@ export async function createApp(options = {}) {
       category = normalizeCategory(await categorize(message));
     } catch {
       category = null;
+    }
     
     const feedback = {
       id: crypto.randomUUID(), nric, name, message, category: category ?? fallbackCategory(message), status: "New",

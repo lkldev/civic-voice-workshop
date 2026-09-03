@@ -164,6 +164,27 @@ describe("CivicVoice baseline API", () => {
     expect(response.status).toBe(403);
   });
 
+  it("exports filtered feedback as safely quoted CSV", async () => {
+    const app = await testApp();
+    const login = await request(app).post("/api/login").send({
+      nric: "S0000002B", password: "admin123", role: "admin",
+    });
+    app.locals.db.data.feedback = [
+      { id: "csv-match", nric: "S0000001A", name: "Aisha Rahman", message: "Road, near block 2\nNeeds lights", category: "Transport", status: "Closed", createdAt: "2026-09-01T00:00:00.000Z" },
+      { id: "csv-other", nric: "S0000001A", name: "Aisha Rahman", message: "Park", category: "Estate", status: "New", createdAt: "2026-09-02T00:00:00.000Z" },
+    ];
+
+    const response = await request(app)
+      .get("/api/feedback/export.csv?category=Transport&status=Closed")
+      .set("Authorization", `Bearer ${login.body.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/csv");
+    expect(response.text).toContain('"id","nric","name","message","category","status","createdAt"');
+    expect(response.text).toContain('"csv-match","S0000001A","Aisha Rahman","Road, near block 2\nNeeds lights","Transport","Closed"');
+    expect(response.text).not.toContain("csv-other");
+  });
+
   it("allows an admin to update and persist feedback status", async () => {
     const app = await testApp();
     const login = await request(app).post("/api/login").send({
